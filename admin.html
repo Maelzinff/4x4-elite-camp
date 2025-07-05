@@ -1,178 +1,118 @@
+<?php
+session_start();
+
+include 'config.php';
+
+$senhaCorreta = "Arthur2025";
+
+if (isset($_POST['senha'])) {
+    if ($_POST['senha'] === $senhaCorreta) {
+        $_SESSION['logado'] = true;
+    } else {
+        $erro = "Senha incorreta.";
+    }
+}
+
+if (!isset($_SESSION['logado']) || $_SESSION['logado'] !== true) {
+    ?>
+    <form method="post">
+        <label>Senha de acesso:</label>
+        <input type="password" name="senha" required>
+        <button type="submit">Entrar</button>
+    </form>
+    <?php
+    if (!empty($erro)) echo "<p style='color:red;'>$erro</p>";
+    exit;
+}
+
+// Ações aprovar/apagar/reset
+if (isset($_GET['aprovar'])) {
+    $id = intval($_GET['aprovar']);
+    $conn->query("UPDATE inscritos SET aprovado=1 WHERE id=$id");
+}
+
+if (isset($_GET['apagar'])) {
+    $id = intval($_GET['apagar']);
+    $res = $conn->query("SELECT comprovante FROM inscritos WHERE id=$id");
+    if ($res && $row = $res->fetch_assoc()) {
+        if (file_exists($row['comprovante'])) unlink($row['comprovante']);
+    }
+    $conn->query("DELETE FROM inscritos WHERE id=$id");
+}
+
+if (isset($_GET['reset'])) {
+    // Apaga todos os registros da tabela inscritos
+    $conn->query("DELETE FROM inscritos");
+
+    // Apaga todos os arquivos da pasta uploads
+    $files = glob('uploads/*'); 
+    foreach($files as $file){
+      if(is_file($file))
+        unlink($file); 
+    }
+    echo "<p style='color:green;'>Lista de inscrições resetada com sucesso!</p>";
+}
+
+$result = $conn->query("SELECT * FROM inscritos WHERE aprovado=0");
+$pendentes = $result->fetch_all(MYSQLI_ASSOC);
+
+$result = $conn->query("SELECT * FROM inscritos WHERE aprovado=1");
+$aprovados = $result->fetch_all(MYSQLI_ASSOC);
+?>
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Painel de Administração – 4x4 Elite Camp</title>
-  <link rel="stylesheet" href="style.css" />
-  <style>
-    .painel {
-      max-width: 900px;
-      margin: auto;
-    }
-    .admin-input {
-      margin-bottom: 1rem;
-      display: flex;
-      gap: 0.5rem;
-    }
-    .inscrito {
-      border: 1px solid #ccc;
-      padding: 12px;
-      margin-bottom: 10px;
-      border-radius: 6px;
-      background: #222;
-      color: white;
-    }
-    .botao {
-      margin-right: 6px;
-      padding: 6px 12px;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-      font-weight: bold;
-    }
-    .botao.vermelho {
-      background-color: #e74c3c;
-      color: white;
-    }
-    .botao.verde {
-      background-color: #27ae60;
-      color: white;
-    }
-    .titulo-lista {
-      margin-top: 20px;
-      margin-bottom: 10px;
-      font-size: 1.3rem;
-      font-weight: bold;
-      color: #fff;
-    }
-  </style>
+<meta charset="UTF-8" />
+<title>Painel Admin - 4x4 Elite Camp</title>
+<link rel="stylesheet" href="style.css" />
 </head>
-<body class="fundo-freefire">
-  <div class="container painel">
-    <h1>🔐 Painel de Administração</h1>
-    <div id="login">
-      <label for="senha">Digite a senha:</label>
-      <input type="password" id="senha" />
-      <button onclick="verificarSenha()" class="botao">Entrar</button>
-    </div>
+<body>
+<h1>Painel de Administração</h1>
 
-    <div id="painel" style="display:none;">
-      <div>
-        <h2 class="titulo-lista">Inscrições Pendentes</h2>
-        <div id="listaPendentes"></div>
-      </div>
+<p>
+  <a href="?reset=1" onclick="return confirm('Tem certeza que deseja apagar TODAS as inscrições? Esta ação não pode ser desfeita.')"
+     style="color: red; font-weight: bold;">
+    🔥 Resetar toda a lista de inscrições
+  </a>
+</p>
 
-      <div>
-        <h2 class="titulo-lista">Inscrições Aprovadas</h2>
-        <div id="listaAprovados"></div>
-      </div>
-    </div>
-    <a href="index.html" class="botao voltar">← Voltar</a>
-  </div>
-
-  <script>
-    const senhaCorreta = "Arthur2025";
-
-    function verificarSenha() {
-      const senha = document.getElementById("senha").value;
-      if (senha === senhaCorreta) {
-        document.getElementById("login").style.display = "none";
-        document.getElementById("painel").style.display = "block";
-        carregarPendentes();
-        carregarAprovados();
-      } else {
-        alert("Senha incorreta.");
-      }
+<h2>Inscrições Pendentes</h2>
+<?php
+if (count($pendentes) === 0) {
+    echo "<p>Nenhuma inscrição pendente.</p>";
+} else {
+    echo "<ul>";
+    foreach ($pendentes as $inscrito) {
+        echo "<li><strong>" . htmlspecialchars($inscrito['nomeTime']) . "</strong> - " .
+            nl2br(htmlspecialchars($inscrito['jogadores'])) . " - Discord: " .
+            htmlspecialchars($inscrito['discord']) .
+            " - <a href='" . htmlspecialchars($inscrito['comprovante']) . "' target='_blank'>Comprovante</a>" .
+            " - <a href='?aprovar=" . $inscrito['id'] . "'>Aprovar</a>" .
+            " - <a href='?apagar=" . $inscrito['id'] . "' onclick='return confirm(\"Confirma exclusão?\")'>Apagar</a>" .
+            "</li>";
     }
+    echo "</ul>";
+}
+?>
 
-    function carregarPendentes() {
-      const lista = document.getElementById("listaPendentes");
-      lista.innerHTML = "";
-      const inscritos = JSON.parse(localStorage.getItem("inscritos") || "[]");
-      const aprovados = JSON.parse(localStorage.getItem("aprovados") || "[]");
-
-      const pendentes = inscritos.filter(item => !aprovados.find(a => a.nomeTime === item.nomeTime));
-      if (pendentes.length === 0) {
-        lista.innerHTML = "<p>Nenhuma inscrição pendente.</p>";
-        return;
-      }
-
-      pendentes.forEach(item => {
-        const bloco = document.createElement("div");
-        bloco.className = "inscrito";
-        bloco.innerHTML = `
-          <h3>${item.nomeTime}</h3>
-          <p><strong>Jogadores:</strong><br>${item.jogadores.replaceAll(",", "<br>")}</p>
-          <p><strong>Discord:</strong> ${item.discord}</p>
-          <p><strong>Comprovante:</strong><br>${item.comprovante}</p>
-          <button onclick='aprovar("${item.nomeTime}")' class="botao verde">✅ Aprovar</button>
-          <button onclick='apagar("${item.nomeTime}")' class="botao vermelho">🗑 Apagar</button>
-        `;
-        lista.appendChild(bloco);
-      });
+<h2>Equipes Aprovadas</h2>
+<?php
+if (count($aprovados) === 0) {
+    echo "<p>Nenhuma equipe aprovada.</p>";
+} else {
+    echo "<ul>";
+    foreach ($aprovados as $aprovado) {
+        echo "<li><strong>" . htmlspecialchars($aprovado['nomeTime']) . "</strong> - " .
+            nl2br(htmlspecialchars($aprovado['jogadores'])) . " - Discord: " .
+            htmlspecialchars($aprovado['discord']) .
+            " - <a href='" . htmlspecialchars($aprovado['comprovante']) . "' target='_blank'>Comprovante</a>" .
+            " - <a href='?apagar=" . $aprovado['id'] . "' onclick='return confirm(\"Confirma exclusão?\")'>Apagar</a>" .
+            "</li>";
     }
+    echo "</ul>";
+}
+?>
 
-    function carregarAprovados() {
-      const lista = document.getElementById("listaAprovados");
-      lista.innerHTML = "";
-      const aprovados = JSON.parse(localStorage.getItem("aprovados") || "[]");
-
-      if (aprovados.length === 0) {
-        lista.innerHTML = "<p>Nenhuma inscrição aprovada.</p>";
-        return;
-      }
-
-      aprovados.forEach(item => {
-        const bloco = document.createElement("div");
-        bloco.className = "inscrito";
-        bloco.innerHTML = `
-          <h3>${item.nomeTime}</h3>
-          <p><strong>Jogadores:</strong><br>${item.jogadores.replaceAll(",", "<br>")}</p>
-          <p><strong>Discord:</strong> ${item.discord}</p>
-          <p><strong>Comprovante:</strong><br>${item.comprovante}</p>
-          <button onclick='apagar("${item.nomeTime}")' class="botao vermelho">🗑 Apagar</button>
-        `;
-        lista.appendChild(bloco);
-      });
-    }
-
-    function aprovar(nomeTime) {
-      let aprovados = JSON.parse(localStorage.getItem("aprovados") || "[]");
-      const inscritos = JSON.parse(localStorage.getItem("inscritos") || "[]");
-
-      if (aprovados.length >= 16) {
-        alert("Limite de 16 equipes atingido!");
-        return;
-      }
-
-      const time = inscritos.find(item => item.nomeTime === nomeTime);
-      if (!time) {
-        alert("Time não encontrado.");
-        return;
-      }
-
-      aprovados.push(time);
-      localStorage.setItem("aprovados", JSON.stringify(aprovados));
-      carregarPendentes();
-      carregarAprovados();
-      alert(`Equipe '${nomeTime}' aprovada com sucesso!`);
-    }
-
-    function apagar(nomeTime) {
-      let inscritos = JSON.parse(localStorage.getItem("inscritos") || "[]");
-      let aprovados = JSON.parse(localStorage.getItem("aprovados") || "[]");
-
-      inscritos = inscritos.filter(item => item.nomeTime !== nomeTime);
-      aprovados = aprovados.filter(item => item.nomeTime !== nomeTime);
-
-      localStorage.setItem("inscritos", JSON.stringify(inscritos));
-      localStorage.setItem("aprovados", JSON.stringify(aprovados));
-
-      carregarPendentes();
-      carregarAprovados();
-      alert(`Equipe '${nomeTime}' foi apagada!`);
-    }
-  </script>
+<p><a href="index.php">Voltar para inscrições</a></p>
 </body>
 </html>
