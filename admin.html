@@ -3,118 +3,175 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Painel Admin – 4x4 Elite Camp</title>
+  <title>Painel de Administração – 4x4 Elite Camp</title>
   <link rel="stylesheet" href="style.css" />
   <style>
-    .vermelho { background: #e74c3c; }
-    .btn-aprovar, .btn-apagar { margin-left: 8px; }
+    .painel {
+      max-width: 900px;
+      margin: auto;
+    }
+    .admin-input {
+      margin-bottom: 1rem;
+      display: flex;
+      gap: 0.5rem;
+    }
+    .inscrito {
+      border: 1px solid #ccc;
+      padding: 12px;
+      margin-bottom: 10px;
+      border-radius: 6px;
+      background: #222;
+      color: white;
+    }
+    .botao {
+      margin-right: 6px;
+      padding: 6px 12px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    .botao.vermelho {
+      background-color: #e74c3c;
+      color: white;
+    }
+    .botao.verde {
+      background-color: #27ae60;
+      color: white;
+    }
+    .titulo-lista {
+      margin-top: 20px;
+      margin-bottom: 10px;
+      font-size: 1.3rem;
+      font-weight: bold;
+      color: #fff;
+    }
   </style>
 </head>
 <body class="fundo-freefire">
-  <div class="container">
-    <h1>🛠 Painel Admin</h1>
-    <p>Limite de 16 equipes. Senha: <strong>Arthur2025</strong></p>
-
-    <div id="login-area">
-      <input type="password" id="senhaInput" placeholder="Digite a senha" />
-      <button id="btnLogin" class="botao">Entrar</button>
-      <p id="login-msg"></p>
+  <div class="container painel">
+    <h1>🔐 Painel de Administração</h1>
+    <div id="login">
+      <label for="senha">Digite a senha:</label>
+      <input type="password" id="senha" />
+      <button onclick="verificarSenha()" class="botao">Entrar</button>
     </div>
 
     <div id="painel" style="display:none;">
-      <h2>Inscrições Pendentes</h2>
-      <div id="lista-pendentes"></div>
+      <div>
+        <h2 class="titulo-lista">Inscrições Pendentes</h2>
+        <div id="listaPendentes"></div>
+      </div>
 
-      <h2>Equipes Aprovadas</h2>
-      <div id="lista-aprovados"></div>
+      <div>
+        <h2 class="titulo-lista">Inscrições Aprovadas</h2>
+        <div id="listaAprovados"></div>
+      </div>
     </div>
+    <a href="index.html" class="botao voltar">← Voltar</a>
   </div>
 
-  <script type="module">
-    import { db, collection, deleteDoc, doc, updateDoc, onSnapshot } from './firebase-init.js';
-
+  <script>
     const senhaCorreta = "Arthur2025";
-    const loginArea = document.getElementById("login-area");
-    const painel = document.getElementById("painel");
-    const senhaInput = document.getElementById("senhaInput");
-    const btnLogin = document.getElementById("btnLogin");
-    const loginMsg = document.getElementById("login-msg");
-    const listaPendentes = document.getElementById("lista-pendentes");
-    const listaAprovados = document.getElementById("lista-aprovados");
 
-    let aprovadosCount = 0;
-
-    btnLogin.onclick = () => {
-      if (senhaInput.value === senhaCorreta) {
-        loginArea.style.display = "none";
-        painel.style.display = "block";
-        carregarInscricoes();
+    function verificarSenha() {
+      const senha = document.getElementById("senha").value;
+      if (senha === senhaCorreta) {
+        document.getElementById("login").style.display = "none";
+        document.getElementById("painel").style.display = "block";
+        carregarPendentes();
+        carregarAprovados();
       } else {
-        loginMsg.textContent = "Senha incorreta!";
+        alert("Senha incorreta.");
       }
-    };
+    }
 
-    function carregarInscricoes() {
-      const col = collection(db, "inscricoes");
-      onSnapshot(col, (snapshot) => {
-        listaPendentes.innerHTML = "";
-        listaAprovados.innerHTML = "";
-        aprovadosCount = 0;
+    function carregarPendentes() {
+      const lista = document.getElementById("listaPendentes");
+      lista.innerHTML = "";
+      const inscritos = JSON.parse(localStorage.getItem("inscritos") || "[]");
+      const aprovados = JSON.parse(localStorage.getItem("aprovados") || "[]");
 
-        snapshot.docs.forEach(docSnap => {
-          const data = docSnap.data();
-          const id = docSnap.id;
+      const pendentes = inscritos.filter(item => !aprovados.find(a => a.nomeTime === item.nomeTime));
+      if (pendentes.length === 0) {
+        lista.innerHTML = "<p>Nenhuma inscrição pendente.</p>";
+        return;
+      }
 
-          const div = document.createElement("div");
-          div.classList.add("inscricao");
-
-          div.innerHTML = `
-            <p><strong>Time:</strong> ${data.nomeTime}</p>
-            <p><strong>Jogadores:</strong> ${data.jogadores}</p>
-            <p><strong>Discord:</strong> ${data.discord}</p>
-            <p><strong>Comprovativo:</strong> ${data.comprovante}</p>
-          `;
-
-          if(data.status === "pendente") {
-            const btnAprovar = document.createElement("button");
-            btnAprovar.textContent = "✅ Aprovar";
-            btnAprovar.className = "botao btn-aprovar";
-            btnAprovar.onclick = () => aprovarInscricao(id);
-            div.appendChild(btnAprovar);
-
-            const btnApagar = document.createElement("button");
-            btnApagar.textContent = "🗑 Apagar";
-            btnApagar.className = "botao vermelho btn-apagar";
-            btnApagar.onclick = () => apagarInscricao(id);
-            div.appendChild(btnApagar);
-
-            listaPendentes.appendChild(div);
-          } else if(data.status === "aprovado") {
-            aprovadosCount++;
-            const btnApagar = document.createElement("button");
-            btnApagar.textContent = "🗑 Apagar";
-            btnApagar.className = "botao vermelho btn-apagar";
-            btnApagar.onclick = () => apagarInscricao(id);
-            div.appendChild(btnApagar);
-            listaAprovados.appendChild(div);
-          }
-        });
+      pendentes.forEach(item => {
+        const bloco = document.createElement("div");
+        bloco.className = "inscrito";
+        bloco.innerHTML = `
+          <h3>${item.nomeTime}</h3>
+          <p><strong>Jogadores:</strong><br>${item.jogadores.replaceAll(",", "<br>")}</p>
+          <p><strong>Discord:</strong> ${item.discord}</p>
+          <p><strong>Comprovante:</strong><br>${item.comprovante}</p>
+          <button onclick='aprovar("${item.nomeTime}")' class="botao verde">✅ Aprovar</button>
+          <button onclick='apagar("${item.nomeTime}")' class="botao vermelho">🗑 Apagar</button>
+        `;
+        lista.appendChild(bloco);
       });
     }
 
-    async function aprovarInscricao(id) {
-      if (aprovadosCount >= 16) {
-        alert("Limite de 16 equipes já atingido!");
+    function carregarAprovados() {
+      const lista = document.getElementById("listaAprovados");
+      lista.innerHTML = "";
+      const aprovados = JSON.parse(localStorage.getItem("aprovados") || "[]");
+
+      if (aprovados.length === 0) {
+        lista.innerHTML = "<p>Nenhuma inscrição aprovada.</p>";
         return;
       }
-      const docRef = doc(db, "inscricoes", id);
-      await updateDoc(docRef, { status: "aprovado" });
+
+      aprovados.forEach(item => {
+        const bloco = document.createElement("div");
+        bloco.className = "inscrito";
+        bloco.innerHTML = `
+          <h3>${item.nomeTime}</h3>
+          <p><strong>Jogadores:</strong><br>${item.jogadores.replaceAll(",", "<br>")}</p>
+          <p><strong>Discord:</strong> ${item.discord}</p>
+          <p><strong>Comprovante:</strong><br>${item.comprovante}</p>
+          <button onclick='apagar("${item.nomeTime}")' class="botao vermelho">🗑 Apagar</button>
+        `;
+        lista.appendChild(bloco);
+      });
     }
 
-    async function apagarInscricao(id) {
-      if(confirm("Tem certeza que deseja apagar essa inscrição?")) {
-        await deleteDoc(doc(db, "inscricoes", id));
+    function aprovar(nomeTime) {
+      let aprovados = JSON.parse(localStorage.getItem("aprovados") || "[]");
+      const inscritos = JSON.parse(localStorage.getItem("inscritos") || "[]");
+
+      if (aprovados.length >= 16) {
+        alert("Limite de 16 equipes atingido!");
+        return;
       }
+
+      const time = inscritos.find(item => item.nomeTime === nomeTime);
+      if (!time) {
+        alert("Time não encontrado.");
+        return;
+      }
+
+      aprovados.push(time);
+      localStorage.setItem("aprovados", JSON.stringify(aprovados));
+      carregarPendentes();
+      carregarAprovados();
+      alert(`Equipe '${nomeTime}' aprovada com sucesso!`);
+    }
+
+    function apagar(nomeTime) {
+      let inscritos = JSON.parse(localStorage.getItem("inscritos") || "[]");
+      let aprovados = JSON.parse(localStorage.getItem("aprovados") || "[]");
+
+      inscritos = inscritos.filter(item => item.nomeTime !== nomeTime);
+      aprovados = aprovados.filter(item => item.nomeTime !== nomeTime);
+
+      localStorage.setItem("inscritos", JSON.stringify(inscritos));
+      localStorage.setItem("aprovados", JSON.stringify(aprovados));
+
+      carregarPendentes();
+      carregarAprovados();
+      alert(`Equipe '${nomeTime}' foi apagada!`);
     }
   </script>
 </body>
