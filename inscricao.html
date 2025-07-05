@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Inscrição – 4x4 Elite Camp</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="fundo-freefire">
+  <div class="container">
+    <h1>📥 Formulário de Inscrição</h1>
+    <form id="formInscricao">
+      <label>Nome da Equipe:</label>
+      <input type="text" name="nomeTime" required />
+      
+      <label>Jogadores (separados por vírgula):</label>
+      <textarea name="jogadores" required></textarea>
+      
+      <label>Discord do Capitão:</label>
+      <input type="text" name="discord" required />
+      
+      <label>Comprovativo (link ou descrição):</label>
+      <textarea name="comprovante" required></textarea>
+      
+      <button type="submit" class="botao">Enviar Inscrição</button>
+    </form>
+    <p id="mensagem" style="margin-top: 1rem;"></p>
+    <a href="index.html" class="botao voltar">← Voltar</a>
+  </div>
+
+  <script type="module">
+    import { db, collection, addDoc } from './firebase-init.js';
+
+    const form = document.getElementById("formInscricao");
+    const mensagem = document.getElementById("mensagem");
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const data = Object.fromEntries(new FormData(form).entries());
+      try {
+        await addDoc(collection(db, "inscricoes"), {
+          ...data,
+          status: "pendente",
+          timestamp: Date.now()
+        });
+        form.reset();
+        mensagem.textContent = "✅ Inscrição enviada com sucesso!";
+      } catch (err) {
+        mensagem.textContent = "❌ Erro ao enviar inscrição.";
+        console.error(err);
+      }
+    });
+  </script>
+</body>
+</html>

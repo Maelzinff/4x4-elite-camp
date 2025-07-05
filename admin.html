@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Painel Admin – 4x4 Elite Camp</title>
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    .vermelho { background: #e74c3c; }
+    .btn-aprovar, .btn-apagar { margin-left: 8px; }
+  </style>
+</head>
+<body class="fundo-freefire">
+  <div class="container">
+    <h1>🛠 Painel Admin</h1>
+    <p>Limite de 16 equipes. Senha: <strong>Arthur2025</strong></p>
+
+    <div id="login-area">
+      <input type="password" id="senhaInput" placeholder="Digite a senha" />
+      <button id="btnLogin" class="botao">Entrar</button>
+      <p id="login-msg"></p>
+    </div>
+
+    <div id="painel" style="display:none;">
+      <h2>Inscrições Pendentes</h2>
+      <div id="lista-pendentes"></div>
+
+      <h2>Equipes Aprovadas</h2>
+      <div id="lista-aprovados"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { db, collection, deleteDoc, doc, updateDoc, onSnapshot } from './firebase-init.js';
+
+    const senhaCorreta = "Arthur2025";
+    const loginArea = document.getElementById("login-area");
+    const painel = document.getElementById("painel");
+    const senhaInput = document.getElementById("senhaInput");
+    const btnLogin = document.getElementById("btnLogin");
+    const loginMsg = document.getElementById("login-msg");
+    const listaPendentes = document.getElementById("lista-pendentes");
+    const listaAprovados = document.getElementById("lista-aprovados");
+
+    let aprovadosCount = 0;
+
+    btnLogin.onclick = () => {
+      if (senhaInput.value === senhaCorreta) {
+        loginArea.style.display = "none";
+        painel.style.display = "block";
+        carregarInscricoes();
+      } else {
+        loginMsg.textContent = "Senha incorreta!";
+      }
+    };
+
+    function carregarInscricoes() {
+      const col = collection(db, "inscricoes");
+      onSnapshot(col, (snapshot) => {
+        listaPendentes.innerHTML = "";
+        listaAprovados.innerHTML = "";
+        aprovadosCount = 0;
+
+        snapshot.docs.forEach(docSnap => {
+          const data = docSnap.data();
+          const id = docSnap.id;
+
+          const div = document.createElement("div");
+          div.classList.add("inscricao");
+
+          div.innerHTML = `
+            <p><strong>Time:</strong> ${data.nomeTime}</p>
+            <p><strong>Jogadores:</strong> ${data.jogadores}</p>
+            <p><strong>Discord:</strong> ${data.discord}</p>
+            <p><strong>Comprovativo:</strong> ${data.comprovante}</p>
+          `;
+
+          if(data.status === "pendente") {
+            const btnAprovar = document.createElement("button");
+            btnAprovar.textContent = "✅ Aprovar";
+            btnAprovar.className = "botao btn-aprovar";
+            btnAprovar.onclick = () => aprovarInscricao(id);
+            div.appendChild(btnAprovar);
+
+            const btnApagar = document.createElement("button");
+            btnApagar.textContent = "🗑 Apagar";
+            btnApagar.className = "botao vermelho btn-apagar";
+            btnApagar.onclick = () => apagarInscricao(id);
+            div.appendChild(btnApagar);
+
+            listaPendentes.appendChild(div);
+          } else if(data.status === "aprovado") {
+            aprovadosCount++;
+            const btnApagar = document.createElement("button");
+            btnApagar.textContent = "🗑 Apagar";
+            btnApagar.className = "botao vermelho btn-apagar";
+            btnApagar.onclick = () => apagarInscricao(id);
+            div.appendChild(btnApagar);
+            listaAprovados.appendChild(div);
+          }
+        });
+      });
+    }
+
+    async function aprovarInscricao(id) {
+      if (aprovadosCount >= 16) {
+        alert("Limite de 16 equipes já atingido!");
+        return;
+      }
+      const docRef = doc(db, "inscricoes", id);
+      await updateDoc(docRef, { status: "aprovado" });
+    }
+
+    async function apagarInscricao(id) {
+      if(confirm("Tem certeza que deseja apagar essa inscrição?")) {
+        await deleteDoc(doc(db, "inscricoes", id));
+      }
+    }
+  </script>
+</body>
+</html>
